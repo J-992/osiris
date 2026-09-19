@@ -4,6 +4,7 @@ import { fetchFloridaCameras } from './florida';
 import { fetchGeorgiaCameras } from './georgia';
 import { fetchNorthCarolinaCameras } from './northcarolina';
 import { fetchArizonaCameras } from './arizona';
+import { fetchNewYorkCameras } from './newyork';
 
 const FDOT: Ibi511Source = {
   base: 'https://fl511.com',
@@ -11,6 +12,14 @@ const FDOT: Ibi511Source = {
   source: 'FDOT',
   state: 'Florida',
   bounds: { minLat: 24.4, maxLat: 31.1, minLng: -87.7, maxLng: -79.9 },
+};
+
+const NY511: Ibi511Source = {
+  base: 'https://511ny.org',
+  idPrefix: 'nysdot',
+  source: '511NY',
+  state: 'New York',
+  bounds: { minLat: 40.4, maxLat: 45.1, minLng: -79.9, maxLng: -71.8 },
 };
 
 /** A representative row from fl511.com/List/GetData/Cameras. */
@@ -154,6 +163,31 @@ describe('mapIbi511Record', () => {
   });
 });
 
+describe('New York bounds', () => {
+  const at = (lng: number, lat: number) =>
+    mapIbi511Record({ ...sample, latLng: { geography: { wellKnownText: `POINT (${lng} ${lat})` } } }, NY511);
+
+  /* 511NY pools NYSDOT and the Thruway Authority, so the box has to hold the
+     whole state at once: the Battery, Montauk at the eastern tip of Long
+     Island, Buffalo in the west and Champlain on the Canadian line. */
+  it('keeps cameras across the whole state', () => {
+    expect(at(-74.013, 40.703)?.id).toBe('nysdot-1'); // Lower Manhattan
+    expect(at(-71.94, 41.05)).not.toBeNull();         // Montauk
+    expect(at(-78.878, 42.886)).not.toBeNull();       // Buffalo
+    expect(at(-73.447, 44.985)).not.toBeNull();       // Champlain
+  });
+
+  it('drops rows outside the state', () => {
+    expect(at(-71.41, 41.82)).toBeNull();  // Providence, RI
+    expect(at(-80.0, 40.44)).toBeNull();   // Pittsburgh, PA
+    expect(at(-73.06, 45.5)).toBeNull();   // Montreal, QC
+  });
+
+  it('credits 511NY rather than one of the two agencies it pools', () => {
+    expect(at(-74.013, 40.703)?.source).toBe('511NY');
+  });
+});
+
 describe('parseWkt', () => {
   it('reads longitude first, as the platform writes it', () => {
     expect(parseWkt('POINT (-80.892882 26.17325)')).toEqual({ lat: 26.17325, lng: -80.892882 });
@@ -173,6 +207,7 @@ describe('live southern-tier feeds', () => {
     ['Georgia', fetchGeorgiaCameras, 2500, { minLat: 30.3, maxLat: 35.1, minLng: -85.7, maxLng: -80.8 }],
     ['North Carolina', fetchNorthCarolinaCameras, 800, { minLat: 33.8, maxLat: 36.6, minLng: -84.4, maxLng: -75.4 }],
     ['Arizona', fetchArizonaCameras, 400, { minLat: 31.3, maxLat: 37.1, minLng: -115.0, maxLng: -109.0 }],
+    ['New York', fetchNewYorkCameras, 1200, NY511.bounds],
   ];
 
   for (const [name, fetcher, atLeast, bounds] of cases) {
