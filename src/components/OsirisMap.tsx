@@ -306,7 +306,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks', 'exposed'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
@@ -564,6 +564,24 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
         'text-field': ['get','name'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 2], 'text-max-width': 14, 'text-allow-overlap': false,
       }, paint: { 'text-color': ['case', ['in', 'SEISMIC RISK', ['get', 'status']], '#E65100', '#26A69A'], 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.7 }});
+
+      // Exposed Infrastructure (Shodan) — colour is precomputed per host: red
+      // when it carries known CVEs, otherwise a per-category hue.
+      map.addLayer({ id: 'exposed-glow', type: 'circle', source: 'exposed', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,7, 5,12, 10,18],
+        'circle-color': ['get','color'], 'circle-opacity': 0.10, 'circle-blur': 1,
+      }});
+      map.addLayer({ id: 'exposed-dots', type: 'circle', source: 'exposed', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,3, 5,5, 10,8],
+        'circle-color': ['get','color'],
+        'circle-opacity': 0.8,
+        'circle-stroke-width': ['case', ['>', ['get','vulnCount'], 0], 1.5, 0.8],
+        'circle-stroke-color': ['get','color'], 'circle-stroke-opacity': 0.5,
+      }});
+      map.addLayer({ id: 'exposed-label', type: 'symbol', source: 'exposed', minzoom: 6, layout: {
+        'text-field': ['get','label'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
+        'text-offset': [0, 1.6], 'text-max-width': 16, 'text-allow-overlap': false,
+      }, paint: { 'text-color': ['get','color'], 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.7 }});
 
       // Satellites.
       // Every satellite is drawn once, by the custom 3D layer below, at its
@@ -970,7 +988,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
       'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-events-dots',
-      'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
+      'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots','exposed-dots']);
 
     // Satellites are picked on the GPU: the pick pass runs the same vertex
     // shader as the visible one, so the target is always exactly where the
@@ -1293,7 +1311,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','cctv-dots','eq-circles','fires-heat','gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-events-dots','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','cctv-dots','eq-circles','fires-heat','gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-events-dots','cf-outage-dots','cf-attack-dots','exposed-dots'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -1479,6 +1497,48 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           ${ref}
           <a href="https://www.google.com/maps/@${coords[1]},${coords[0]},14z/data=!3m1!1e3" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#8A8880;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);">SATELLITE</a>
+        </div>
+      </div>`);
+    });
+
+    // ── Exposed Infrastructure (Shodan) ──
+    map.on('click', 'exposed-dots', e => {
+      if (!e.features?.length) return;
+      const p = e.features[0].properties as any;
+      const coords = (e.features[0].geometry as any).coordinates;
+      const accent = String(p.color || '#B388FF');
+      const vulnCount = Number(p.vulnCount || 0);
+
+      const row = (label: string, value: string, color = '#E8E6E0') =>
+        `<div><span style="color:#5C5A54;">${label}</span><br/><span style="color:${color};">${value}</span></div>`;
+
+      const vulnBlock = vulnCount > 0
+        ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
+             <div style="color:#FF3D3D;font-size:9px;letter-spacing:0.1em;margin-bottom:4px;">⚠ ${vulnCount} KNOWN VULN${vulnCount === 1 ? '' : 'S'}</div>
+             <div style="color:#E8E6E0;font-size:9px;word-break:break-all;line-height:1.5;">${htmlEsc(p.vulns)}</div>
+           </div>`
+        : '';
+
+      const ports = p.ports || (p.port ? String(p.port) : '');
+
+      popup(coords, `<div style="${pStyle}border:1px solid ${accent}4D;">
+        <div style="color:${accent};font-size:14px;font-weight:700;margin-bottom:2px;">📡 ${htmlEsc(p.product || p.ip || 'Exposed Host')}</div>
+        <div style="color:#5C5A54;font-size:9px;letter-spacing:0.1em;margin-bottom:10px;">${htmlEsc([p.city, p.country].filter(Boolean).join(', ')) || '—'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 6px;font-size:9px;">
+          ${row('IP', htmlEsc(p.ip) || '—', accent)}
+          ${row('PORT(S)', htmlEsc(ports) || '—')}
+          ${row('ORG', htmlEsc(p.org) || '—')}
+          ${row('ISP', htmlEsc(p.isp) || '—')}
+          ${p.os ? row('OS', htmlEsc(p.os)) : ''}
+          ${p.tags ? row('TAGS', htmlEsc(p.tags), accent) : ''}
+        </div>
+        ${p.hostnames ? `<div style="margin-top:8px;font-size:9px;"><span style="color:#5C5A54;">HOSTNAMES</span><br/><span style="color:#E8E6E0;word-break:break-all;">${htmlEsc(p.hostnames)}</span></div>` : ''}
+        ${vulnBlock}
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);font-size:9px;color:#5C5A54;">
+          ${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <a href="https://www.shodan.io/host/${encodeURIComponent(p.ip)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1A;">SHODAN</a>
         </div>
       </div>`);
     });
@@ -1970,6 +2030,35 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
     setGeo('infrastructure', activeLayers.infrastructure && data.infrastructure ? data.infrastructure.map((i: any) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [i.lng, i.lat] }, properties: { name: i.name, city: i.city, country: i.country, status: i.status, reactors: i.reactors, capacityMW: i.capacityMW, owner: i.owner, sourceUrl: i.sourceUrl ?? null } })) : []);
   }, [mapReady, data.infrastructure, activeLayers.infrastructure, setGeo]);
 
+  // Exposed Infrastructure (Shodan) → GeoJSON
+  useEffect(() => {
+    if (!mapReady) return;
+    const al = activeLayers as any;
+    setGeo('exposed', al.exposed && data.exposed_devices ? data.exposed_devices.map((d: any) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [d.lng, d.lat] },
+      properties: {
+        // The dot label reads best as product then org, falling back to IP.
+        label: d.product || d.org || d.ip || '',
+        ip: d.ip,
+        port: d.port ?? null,
+        ports: Array.isArray(d.ports) ? d.ports.join(', ') : '',
+        org: d.org ?? '',
+        isp: d.isp ?? '',
+        os: d.os ?? '',
+        product: d.product ?? '',
+        city: d.city ?? '',
+        country: d.country ?? '',
+        hostnames: Array.isArray(d.hostnames) ? d.hostnames.join(', ') : '',
+        tags: Array.isArray(d.tags) ? d.tags.join(', ') : '',
+        vulns: Array.isArray(d.vulns) ? d.vulns.join(', ') : '',
+        vulnCount: Array.isArray(d.vulns) ? d.vulns.length : 0,
+        category: d.category ?? '',
+        color: d.color || '#B388FF',
+      },
+    })) : []);
+  }, [mapReady, data.exposed_devices, (activeLayers as any).exposed, setGeo]);
+
   useEffect(() => {
     if (!mapReady) return;
     setGeo('maritime', activeLayers.maritime && data.maritime_ports ? data.maritime_ports.map((p: any) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] }, properties: { name: p.name, country: p.country, type: p.type, volume: p.volume, fleet: p.fleet, rank: p.rank } })) : []);
@@ -2125,6 +2214,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
     setVis(['fires-heat'], activeLayers.fires);
     setVis(['weather-glow','weather-dots','weather-label'], activeLayers.weather);
     setVis(['infra-glow','infra-dots','infra-label'], activeLayers.infrastructure);
+    setVis(['exposed-glow','exposed-dots','exposed-label'], (activeLayers as any).exposed);
     setVis(['maritime-glow','maritime-dots','maritime-label'], activeLayers.maritime);
     setVis(['choke-glow','choke-dots','choke-label'], activeLayers.maritime);
     setVis(['ship-dots','ship-label'], activeLayers.maritime);

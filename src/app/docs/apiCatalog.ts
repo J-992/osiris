@@ -359,6 +359,17 @@ export const API_GROUPS: ApiGroup[] = [
           'Server-sent events for the malware layer: a snapshot on connect, then new detections as URLhaus reports them.',
         returns: ['snapshot', 'detections', 'status', 'heartbeat'],
       },
+      {
+        path: '/api/shodan-exposed',
+        method: 'GET',
+        summary:
+          'Geolocated internet-exposed hosts (ICS/SCADA, webcams, databases, RDP) from the Shodan search API for the Exposed Infra layer. Requires SHODAN_API_KEY; probe=1 reports configuration.',
+        params: [
+          { name: 'category', required: false, desc: 'Preset query: ics, scada, webcam, database, rdp.', example: 'ics' },
+          { name: 'q', required: false, desc: 'Raw Shodan search query (overrides category).', example: 'port:502 country:NL' },
+        ],
+        returns: ['configured', 'query', 'category', 'total', 'returned', 'devices', 'timestamp'],
+      },
     ],
   },
   {

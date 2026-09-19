@@ -315,6 +315,7 @@ export default function Dashboard() {
     gdelt_events: false,
     cf_outages: false,
     cf_attacks: false,
+    exposed: false,
   });
   // Server-side capability flags — gate layers that need credentials.
   const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
@@ -349,6 +350,11 @@ export default function Dashboard() {
     fetch('/api/cloudflare-radar?probe=1')
       .then(r => (r.ok ? r.json() : null))
       .then(p => { if (p) setCapabilities(c => ({ ...c, cloudflare: !!p.configured })); })
+      .catch(() => { /* leave the layer hidden */ });
+
+    fetch('/api/shodan-exposed?probe=1')
+      .then(r => (r.ok ? r.json() : null))
+      .then(p => { if (p) setCapabilities(c => ({ ...c, shodan: !!p.configured })); })
       .catch(() => { /* leave the layer hidden */ });
 
     // Delay geolocation until map is ready (after splash screen clears)
@@ -716,6 +722,12 @@ export default function Dashboard() {
         cf_outages: d.outages ?? [],
         cf_attack_origins: d.attack_origins ?? [],
       }));
+    }
+
+    // Exposed Infrastructure (Shodan search). Fetched once per toggle rather
+    // than polled — Shodan is slow and search burns query credits.
+    if ((activeLayers as any).exposed) {
+      loadLayerOnce('exposed', '/api/shodan-exposed', d => ({ exposed_devices: d.devices ?? [] }));
     }
 
 

@@ -119,6 +119,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'malware', label: 'Live Malware', dataKey: 'malware_threats' },
       { key: 'cyber_attacks', label: 'Live Attacks', dataKey: 'cyber_attacks' },
+      { key: 'exposed', label: 'Exposed Infra', dataKey: 'exposed_devices', requires: 'shodan' },
     ],
   },
   {
