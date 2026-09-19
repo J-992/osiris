@@ -319,6 +319,9 @@ export default function Dashboard() {
   });
   // Server-side capability flags — gate layers that need credentials.
   const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
+  // Exposed Infra (Shodan) preset category, and the presets the server offers.
+  const [exposedCategory, setExposedCategory] = useState('ics');
+  const [shodanCategories, setShodanCategories] = useState<Array<{ id: string; label: string }>>([]);
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
   const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
@@ -354,7 +357,11 @@ export default function Dashboard() {
 
     fetch('/api/shodan-exposed?probe=1')
       .then(r => (r.ok ? r.json() : null))
-      .then(p => { if (p) setCapabilities(c => ({ ...c, shodan: !!p.configured })); })
+      .then(p => {
+        if (!p) return;
+        setCapabilities(c => ({ ...c, shodan: !!p.configured }));
+        if (Array.isArray(p.categories)) setShodanCategories(p.categories);
+      })
       .catch(() => { /* leave the layer hidden */ });
 
     // Delay geolocation until map is ready (after splash screen clears)
@@ -724,14 +731,22 @@ export default function Dashboard() {
       }));
     }
 
-    // Exposed Infrastructure (Shodan search). Fetched once per toggle rather
-    // than polled — Shodan is slow and search burns query credits.
-    if ((activeLayers as any).exposed) {
-      loadLayerOnce('exposed', '/api/shodan-exposed', d => ({ exposed_devices: d.devices ?? [] }));
-    }
+    // Exposed Infrastructure (Shodan) is handled in its own effect below — it
+    // refetches when the selected category changes, not only on toggle.
 
 
   }, [activeLayers]);
+
+  // Exposed Infrastructure (Shodan search). Fetched when the layer is on and
+  // whenever the category changes — not polled, since Shodan is slow and search
+  // burns query credits.
+  useEffect(() => {
+    if (!(activeLayers as any).exposed) return;
+    fetchEndpoint(
+      `/api/shodan-exposed?category=${encodeURIComponent(exposedCategory)}`,
+      d => ({ exposed_devices: d.devices ?? [] }),
+    );
+  }, [(activeLayers as any).exposed, exposedCategory, fetchEndpoint]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
@@ -1319,7 +1334,7 @@ export default function Dashboard() {
 
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {showLayers && !isMobile && <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={osirisTheme} setTheme={setOsirisTheme} capabilities={capabilities} />}
+      {showLayers && !isMobile && <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={osirisTheme} setTheme={setOsirisTheme} capabilities={capabilities} exposedCategory={exposedCategory} setExposedCategory={setExposedCategory} shodanCategories={shodanCategories} />}
 
 
 
@@ -1697,7 +1712,7 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>NUC</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={osirisTheme} setTheme={setOsirisTheme} capabilities={capabilities} />
+                      <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={osirisTheme} setTheme={setOsirisTheme} capabilities={capabilities} exposedCategory={exposedCategory} setExposedCategory={setExposedCategory} shodanCategories={shodanCategories} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); setMobilePanel(null); }} />
                       </div>

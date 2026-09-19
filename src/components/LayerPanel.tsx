@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plane, Satellite, Sun, AlertTriangle, Camera,
@@ -19,7 +19,22 @@ interface LayerPanelProps {
   /** Server-side capabilities, e.g. { cloudflare: true }. Layers declaring a
    *  `requires` key stay hidden until the matching capability is present. */
   capabilities?: Record<string, boolean>;
+  /** Exposed Infra (Shodan) preset category, and the presets the server offers.
+   *  The selector renders under the "Exposed Infra" layer while it is active. */
+  exposedCategory?: string;
+  setExposedCategory?: (id: string) => void;
+  shodanCategories?: Array<{ id: string; label: string }>;
 }
+
+/* Fallback presets, matching /api/shodan-exposed, used until the server probe
+   populates the live list. */
+const EXPOSED_CATEGORY_FALLBACK = [
+  { id: 'ics', label: 'Industrial Control Systems' },
+  { id: 'scada', label: 'SCADA Devices' },
+  { id: 'webcam', label: 'Exposed Webcams' },
+  { id: 'database', label: 'Exposed Databases' },
+  { id: 'rdp', label: 'Exposed RDP' },
+];
 
 interface LayerDef {
   key: string;
@@ -191,7 +206,7 @@ function SubLayerStem() {
   );
 }
 
-function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, capabilities = {} }: LayerPanelProps) {
+function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, capabilities = {}, exposedCategory = 'ics', setExposedCategory, shodanCategories }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
    * A pinned group stays open when the pointer leaves. Hover-only flyouts are
@@ -243,6 +258,30 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     return found ? total : null;
   };
 
+  const exposedPresets = shodanCategories && shodanCategories.length ? shodanCategories : EXPOSED_CATEGORY_FALLBACK;
+
+  /* Preset picker for the Exposed Infra (Shodan) layer. Rendered under the
+     layer row while it is active; clicks are stopped so the row toggle and the
+     flyout's pin/hover are not triggered. */
+  const renderExposedSelect = (padClass: string) =>
+    setExposedCategory ? (
+      <div className={padClass} onClick={(e) => e.stopPropagation()}>
+        <select
+          value={exposedCategory}
+          onChange={(e) => setExposedCategory(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Exposed infrastructure category"
+          className="w-full bg-white/[0.05] border border-white/10 rounded text-[10px] font-mono uppercase tracking-wider text-white/70 px-1.5 py-1 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
+        >
+          {exposedPresets.map((c) => (
+            <option key={c.id} value={c.id} className="bg-black text-white normal-case">
+              {c.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    ) : null;
+
   /* ── MOBILE ── */
   if (isMobile) {
     return (
@@ -258,8 +297,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                 const count = getCount(layer.dataKey, layer.catKey);
                 const dormant = !!layer.parent && !activeLayers[layer.parent];
                 return (
+                  <Fragment key={layer.key}>
                   <button
-                    key={layer.key}
                     onClick={() => toggle(layer.key)}
                     aria-pressed={!!isLayerActive}
                     className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
@@ -275,6 +314,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       </span>
                     )}
                   </button>
+                  {layer.key === 'exposed' && isLayerActive && renderExposedSelect('pl-[38px] pr-1 pb-1')}
+                  </Fragment>
                 );
               })}
             </div>
@@ -444,8 +485,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                         const dormant = !!layer.parent && !activeLayers[layer.parent];
 
                         return (
+                          <Fragment key={layer.key}>
                           <button
-                            key={layer.key}
                             onClick={() => toggle(layer.key)}
                             aria-pressed={!!isLayerActive}
                             title={dormant ? 'Turn the layer above on to use this' : undefined}
@@ -462,6 +503,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                               </span>
                             )}
                           </button>
+                          {layer.key === 'exposed' && isLayerActive && renderExposedSelect('pl-[38px] pr-1 pt-0.5 pb-1')}
+                          </Fragment>
                         );
                       })}
                     </div>
