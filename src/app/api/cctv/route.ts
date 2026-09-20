@@ -38,6 +38,7 @@ import { fetchFloridaCameras } from './florida';
 import { fetchGeorgiaCameras } from './georgia';
 import { fetchNorthCarolinaCameras } from './northcarolina';
 import { fetchArizonaCameras } from './arizona';
+import { fetchNewYorkCameras } from './newyork';
 import { fetchEastAsiaCameras, fetchSeAsiaCameras, fetchWestAsiaCameras } from './opencctv';
 import {
   fetchLatamLiveCameras,
@@ -510,6 +511,7 @@ const RAW_REGION_FETCHERS: Record<string, RegionFetcher> = {
   'georgia': fetchGeorgiaCameras,
   'northcarolina': fetchNorthCarolinaCameras,
   'arizona': fetchArizonaCameras,
+  'newyork': fetchNewYorkCameras,
   'eastasia': fetchEastAsiaCameras,
   'seasia': fetchSeAsiaCameras,
   'westasia': fetchWestAsiaCameras,
@@ -585,6 +587,9 @@ function getRegionsForBounds(lat: number, lng: number, radius: number): string[]
   if (lat > 30.3 && lat < 35.1 && lng > -85.7 && lng < -80.8) regions.push('georgia');
   if (lat > 33.8 && lat < 36.6 && lng > -84.4 && lng < -75.4) regions.push('northcarolina');
   if (lat > 31.3 && lat < 37.1 && lng > -115.0 && lng < -109.0) regions.push('arizona');
+  /* New York (511NY) — the us-east box stops at 49N and reaches the
+     latitudes, but carries no New York agency of its own. */
+  if (lat > 40.4 && lat < 45.1 && lng > -79.9 && lng < -71.8) regions.push('newyork');
   // Canada
   if (lat > 42 && lat < 70 && lng > -141 && lng < -52) regions.push('canada');
   // Europe
